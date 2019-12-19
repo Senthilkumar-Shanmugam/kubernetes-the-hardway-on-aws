@@ -57,10 +57,35 @@ aws ec2 authorize-security-group-ingress --group-id ${SECURITY_GROUP_ID} --proto
 aws ec2 authorize-security-group-ingress --group-id ${SECURITY_GROUP_ID} --protocol icmp --port -1 --cidr 0.0.0.0/0
 
 
-  Provisioning AWS Load Balancer to Front HA Master Node API server
-  ===================================================================
-   we will do this laterCompute Instances
+Provisioning AWS Load Balancer to Front HA Master Node API server
+===================================================================
 
+Since ELB is not free, I am going to provision a separate EC2 instance and run HA proxy on it.
+
+LOAD_BALANCER_ARN=$(aws elbv2 create-load-balancer \
+    --name kubernetes \
+    --subnets ${SUBNET_ID} \
+    --scheme internet-facing \
+    --type network \
+    --output text --query 'LoadBalancers[].LoadBalancerArn')
+  TARGET_GROUP_ARN=$(aws elbv2 create-target-group \
+    --name kubernetes \
+    --protocol TCP \
+    --port 6443 \
+    --vpc-id ${VPC_ID} \
+    --target-type ip \
+    --output text --query 'TargetGroups[].TargetGroupArn')
+  aws elbv2 register-targets --target-group-arn ${TARGET_GROUP_ARN} --targets Id=10.240.0.1{0,1,2}
+  aws elbv2 create-listener \
+    --load-balancer-arn ${LOAD_BALANCER_ARN} \
+    --protocol TCP \
+    --port 443 \
+    --default-actions Type=forward,TargetGroupArn=${TARGET_GROUP_ARN} \
+    --output text --query 'Listeners[].ListenerArn'
+KUBERNETES_PUBLIC_ADDRESS=$(aws elbv2 describe-load-balancers \
+  --load-balancer-arns ${LOAD_BALANCER_ARN} \
+  --output text --query 'LoadBalancers[].DNSName')
+  
 Instance Image
 ==============
 
