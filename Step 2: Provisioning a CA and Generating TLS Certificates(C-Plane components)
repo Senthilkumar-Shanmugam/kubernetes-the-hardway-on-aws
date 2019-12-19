@@ -100,10 +100,10 @@ DNS.1 = kubernetes
 DNS.2 = kubernetes.default
 DNS.3 = kubernetes.default.svc
 DNS.4 = kubernetes.default.svc.cluster.local
-IP.1 = 10.96.0.1
-IP.2 = 192.168.5.11
-IP.3 = 192.168.5.12
-IP.4 = 192.168.5.30
+IP.1 = 13.235.185.37
+IP.2 = 13.127.40.94
+IP.3 = 13.233.160.218
+IP.4 = 13.233.104.51
 IP.5 = 127.0.0.1
 EOF
 
@@ -111,4 +111,58 @@ Generates certs for kube-apiserver
 -------------------------------------
 openssl genrsa -out kube-apiserver.key 2048
 openssl req -new -key kube-apiserver.key -subj "/CN=kube-apiserver" -out kube-apiserver.csr -config openssl.cnf
-openssl x509 -req -in kube-apiserver.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out kube-apiserver.crt -
+openssl x509 -req -in kube-apiserver.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out kube-apiserver.crt -extensions v3_req -extfile openssl.cnf -days 1000
+
+
+The ETCD Server Certificate
+=============================
+Similarly ETCD server certificate must have addresses of all the servers part of the ETCD cluster
+
+The openssl command cannot take alternate names as command line parameter. So we must create a conf file for it:
+
+cat > openssl-etcd.cnf <<EOF
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+[alt_names]
+IP.1 = 10.240.0.10
+IP.2 = 10.240.0.11
+IP.3 = 10.240.0.12
+IP.3 = 127.0.0.1
+EOF
+
+Generates certs for ETCD
+------------------------
+openssl genrsa -out etcd-server.key 2048
+openssl req -new -key etcd-server.key -subj "/CN=etcd-server" -out etcd-server.csr -config openssl-etcd.cnf
+openssl x509 -req -in etcd-server.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out etcd-server.crt -extensions v3_req -extfile openssl-etcd.cnf -days 1000
+
+The Service Account Key Pair
+============================
+The Kubernetes Controller Manager leverages a key pair to generate and sign service account tokens as describe in the managing service accounts documentation.
+
+Generate the service-account certificate and private key:
+--------------------------------------------------------
+
+openssl genrsa -out service-account.key 2048
+openssl req -new -key service-account.key -subj "/CN=service-accounts" -out service-account.csr
+openssl x509 -req -in service-account.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out service-account.crt -days 1000
+
+Distribute the Certificates to Master Nodes,
+=============================================
+Copy the appropriate certificates and private keys to each controller instance:
+
+Note: add hostname entries
+
+for instance in master1 master2 master3; do
+  scp -i ../ssh/kubernetes.id_rsa ca.crt ca.key kube-apiserver.key kube-apiserver.crt \
+    service-account.key service-account.crt \
+    etcd-server.key etcd-server.crt \
+    ubuntu@${instance}:/home/ubuntu
+done
+
