@@ -1,0 +1,114 @@
+# kubernetes-the-hardway-on-aws
+
+  I will be using open SSL to generate certificates. I will generate them in my local laptop and copy the files over
+  to other nodes.
+
+  This section only deals with generating certificates for control plane components. Certtificates for worker nodes 
+  components will generated later.
+  
+  
+Certificate Authority
+=====================
+
+  In this section you will provision a Certificate Authority that can be used to generate sign the  TLS certificates.
+
+Create a CA certificate, then generate a Certificate Signing Request and use it to create a private key:
+
+# Create private key for CA
+openssl genrsa -out ca.key 2048
+
+# Create CSR using the private key
+openssl req -new -key ca.key -subj "/CN=KUBERNETES-CA" -out ca.csr
+
+# Self sign the csr using its own private key
+openssl x509 -req -in ca.csr -signkey ca.key -CAcreateserial  -out ca.crt -days 1000
+
+ca.crt
+ca.key
+  
+  The ca.crt is the Kubernetes Certificate Authority certificate and ca.key is the Kubernetes Certificate Authority private key.
+  The ca.key is used by the CA for signing certificates. **And it should be securely stored. In this case our master node(s) is
+  our CA server as well, so we will store it on master node(s). There is not need to copy this file to elsewhere.***
+  
+ Client and Server Certificates for Control Plane components +ETCD
+ ==================================================================
+ 
+ The Admin Client Certificate
+ ============================
+    The admin.crt and admin.key file gives you administrative access. We will configure these to be used with the kubectl 
+    tool to perform administrative functions on kubernetes.
+  
+  # Generate private key for admin user
+openssl genrsa -out admin.key 2048
+
+# Generate CSR for admin user. Note the OU.
+openssl req -new -key admin.key -subj "/CN=admin/O=system:masters" -out admin.csr
+
+Note that the admin user is part of the system:masters group. This is how we are able to perform any administrative 
+operations on Kubernetes cluster using kubectl utility.
+
+# Sign certificate for admin user using CA servers private key
+openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out admin.crt -days 1000
+  
+The Kubelet Client Certificates
+================================
+We are going to skip certificate configuration for Worker Nodes for now. We will deal with them when we configure
+the workers. For now let's just focus on the control plane components.  
+
+Generate the kube-controller-manager client certificate and private key:
+
+openssl genrsa -out kube-controller-manager.key 2048
+openssl req -new -key kube-controller-manager.key -subj "/CN=system:kube-controller-manager" -out kube-controller-manager.csr
+openssl x509 -req -in kube-controller-manager.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out kube-controller-manager.crt
+
+The Kube Proxy Client Certificate
+-----------------------------------
+Generate the kube-proxy client certificate and private key:
+
+openssl genrsa -out kube-proxy.key 2048
+openssl req -new -key kube-proxy.key -subj "/CN=system:kube-proxy" -out kube-proxy.csr
+openssl x509 -req -in kube-proxy.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out kube-proxy.crt -days 1000
+
+The Scheduler Client Certificate
+--------------------------------
+openssl genrsa -out kube-scheduler.key 2048
+openssl req -new -key kube-scheduler.key -subj "/CN=system:kube-scheduler" -out kube-scheduler.csr
+openssl x509 -req -in kube-scheduler.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out kube-scheduler.crt -days 1000
+
+
+The Kubernetes API Server Certificate
+=====================================
+  We will do this later. after we provision the control plane components
+  
+The kube-apiserver certificate requires all names that various components may reach it to be part of the alternate names. 
+These include the different DNS names, and IP addresses such as the master servers IP address, the load balancers IP address,
+the kube-api service IP address etc.
+
+The openssl command cannot take alternate names as command line parameter. So we must create a conf file for it:
+
+cat > openssl.cnf <<EOF
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetes.default.svc.cluster.local
+IP.1 = 10.96.0.1
+IP.2 = 192.168.5.11
+IP.3 = 192.168.5.12
+IP.4 = 192.168.5.30
+IP.5 = 127.0.0.1
+EOF
+
+Generates certs for kube-apiserver
+-------------------------------------
+openssl genrsa -out kube-apiserver.key 2048
+openssl req -new -key kube-apiserver.key -subj "/CN=kube-apiserver" -out kube-apiserver.csr -config openssl.cnf
+openssl x509 -req -in kube-apiserver.csr -CA ca.crt -CAkey ca.key -CAcreateserial  -out kube-apiserver.crt -
