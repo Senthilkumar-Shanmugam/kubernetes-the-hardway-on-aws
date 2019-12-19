@@ -131,6 +131,6 @@ for i in 0 1 2; do
     --tags "Key=Name,Value=worker-${i}"
 done
 
-Once instances are created verify that you are able to login into all 6 instances.
+Once instances are created verify that you are able to login into all 6 instances. It also has docker version 19 in all nodes.
 
 ssh -i ssh/{public key} ubuntu@{PUBLIC_IP}
