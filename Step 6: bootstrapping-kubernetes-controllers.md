@@ -125,3 +125,98 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 RestartSec=5
+
+
+Configure the Kubernetes Scheduler
+=======================================
+Move the kube-scheduler kubeconfig into place:
+
+sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
+
+Create the kube-scheduler.service systemd unit file:
+
+cat <<EOF | sudo tee /etc/systemd/system/kube-scheduler.service
+[Unit]
+Description=Kubernetes Scheduler
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+ExecStart=/usr/local/bin/kube-scheduler \\
+  --kubeconfig=/var/lib/kubernetes/kube-scheduler.kubeconfig \\
+  --address=127.0.0.1 \\
+  --leader-elect=true \\
+  --v=2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+Start the Controller Services
+================================
+{
+  sudo systemctl daemon-reload
+  sudo systemctl enable kube-apiserver kube-controller-manager kube-scheduler
+  sudo systemctl start kube-apiserver kube-controller-manager kube-scheduler
+}
+Allow up to 10 seconds for the Kubernetes API Server to fully initialize.
+
+Verification
+==============
+kubectl get componentstatuses --kubeconfig admin.kubeconfig
+
+Load balancer need to be configured for this to work.
+
+NAME                 STATUS    MESSAGE              ERROR
+controller-manager   Healthy   ok
+scheduler            Healthy   ok
+etcd-0               Healthy   {"health": "true"}
+etcd-1               Healthy   {"health": "true"}
+
+The Kubernetes Frontend Load Balancer
+=======================================
+
+In this section you will provision an external load balancer to front the Kubernetes API Servers. The kubernetes-the-hard-way static IP address will be attached to the resulting load balancer.
+
+ssh into Load Balancer node
+
+Provision a Network Load Balancer
+
+#Install HAProxy
+loadbalancer# sudo apt-get update && sudo apt-get install -y haproxy
+
+loadbalancer# cat <<EOF | sudo tee /etc/haproxy/haproxy.cfg 
+frontend kubernetes
+    bind 34.197.154.195:6443
+    option tcplog
+    mode tcp
+    default_backend kubernetes-master-nodes
+
+backend kubernetes-master-nodes
+    mode tcp
+    balance roundrobin
+    option tcp-check
+    server master1 35.170.64.94:6443 check fall 3 rise 2
+    server master2 3.214.215.215:6443 check fall 3 rise 2
+    server master3 3.231.219.99:6443 check fall 3 rise 2
+EOF
+
+loadbalancer# sudo service haproxy restart
+Verification
+Make a HTTP request for the Kubernetes version info:
+
+curl  https://192.168.5.30:6443/version -k
+output
+
+{
+  "major": "1",
+  "minor": "13",
+  "gitVersion": "v1.13.0",
+  "gitCommit": "ddf47ac13c1a9483ea035a79cd7c10005ff21a6d",
+  "gitTreeState": "clean",
+  "buildDate": "2018-12-03T20:56:12Z",
+  "goVersion": "go1.11.2",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+}
