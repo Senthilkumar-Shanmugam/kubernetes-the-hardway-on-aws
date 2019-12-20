@@ -159,3 +159,18 @@ Generate a kubeconfig file for the admin user:
 Results:
 
 admin.kubeconfig
+
+
+Distribute the Kubernetes Configuration Files
+===============================================
+Copy the appropriate kube-proxy kubeconfig files to each worker instance:
+
+for instance in worker1 worker2 worker3; do
+  scp -i ../ssh/kubernetes.id_rsa kube-proxy.kubeconfig ubuntu@${instance}:/home/ubuntu/
+done
+
+Copy the appropriate kube-controller-manager and kube-scheduler kubeconfig files to each controller instance:
+
+for instance in master1 master2 master3; do
+  scp -i ../ssh/kubernetes.id_rsa admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ubuntu@${instance}:/home/ubuntu/
+done
