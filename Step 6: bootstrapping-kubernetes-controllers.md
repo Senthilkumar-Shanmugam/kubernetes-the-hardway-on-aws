@@ -36,10 +36,9 @@ Configure the Kubernetes API Server
 {
   sudo mkdir -p /var/lib/kubernetes/
 
-  sudo cp ca.crt ca.key kube-apiserver.crt kube-apiserver.key \
-    service-account.key service-account.crt \
-    etcd-server.key etcd-server.crt \
-    encryption-config.yaml /var/lib/kubernetes/
+ sudo mv ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
+  service-account-key.pem service-account.pem \
+  encryption-config.yaml /var/lib/kubernetes/
 }
 
 The instance internal IP address will be used to advertise the API Server to members of the cluster.
@@ -69,27 +68,32 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --audit-log-path=/var/log/audit.log \\
   --authorization-mode=Node,RBAC \\
   --bind-address=0.0.0.0 \\
-  --client-ca-file=/var/lib/kubernetes/ca.crt \\
+  --client-ca-file=/var/lib/kubernetes/ca.pem \\
   --enable-admission-plugins=Initializers,NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \\
   --enable-swagger-ui=true \\
-  --etcd-cafile=/var/lib/kubernetes/ca.crt \\
-  --etcd-certfile=/var/lib/kubernetes/etcd-server.crt \\
-  --etcd-keyfile=/var/lib/kubernetes/etcd-server.key \\
+  --etcd-cafile=/var/lib/kubernetes/ca.pem \\
+  --etcd-certfile=/var/lib/kubernetes/kubernetes.pem \\
+  --etcd-keyfile=/var/lib/kubernetes/kubernetes-key.pem \\
   --etcd-servers=https://10.240.0.10:2379,https://10.240.0.11:2379,https://10.240.0.12:2379 \\
   --event-ttl=1h \\
   --experimental-encryption-provider-config=/var/lib/kubernetes/encryption-config.yaml \\
-  --kubelet-certificate-authority=/var/lib/kubernetes/ca.crt \\
-  --kubelet-client-certificate=/var/lib/kubernetes/kube-apiserver.crt \\
-  --kubelet-client-key=/var/lib/kubernetes/kube-apiserver.key \\
+  --kubelet-certificate-authority=/var/lib/kubernetes/ca.pem \\
+  --kubelet-client-certificate=/var/lib/kubernetes/kubernetes.pem \\
+  --kubelet-client-key=/var/lib/kubernetes/kubernetes-key.pem \\
   --kubelet-https=true \\
   --runtime-config=api/all \\
-  --service-account-key-file=/var/lib/kubernetes/service-account.crt \\
+  --service-account-key-file=/var/lib/kubernetes/service-account.pem \\
   --service-cluster-ip-range=10.32.0.0/24 \\
   --service-node-port-range=30000-32767 \\
-  --tls-cert-file=/var/lib/kubernetes/kube-apiserver.crt \\
-  --tls-private-key-file=/var/lib/kubernetes/kube-apiserver.key \\
+  --tls-cert-file=/var/lib/kubernetes/kubernetes.pem \\
+  --tls-private-key-file=/var/lib/kubernetes/kubernetes-key.pem \\
   --v=2
 Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 Configure the Kubernetes Controller Manager
 =============================================
@@ -107,14 +111,14 @@ Documentation=https://github.com/kubernetes/kubernetes
 [Service]
 ExecStart=/usr/local/bin/kube-controller-manager \\
   --address=0.0.0.0 \\
-  --cluster-cidr=10.200.0.0/16  \\
+  --cluster-cidr=10.200.0.0/16 \\
   --cluster-name=kubernetes \\
-  --cluster-signing-cert-file=/var/lib/kubernetes/ca.crt \\
-  --cluster-signing-key-file=/var/lib/kubernetes/ca.key \\
+  --cluster-signing-cert-file=/var/lib/kubernetes/ca.pem \\
+  --cluster-signing-key-file=/var/lib/kubernetes/ca-key.pem \\
   --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
   --leader-elect=true \\
-  --root-ca-file=/var/lib/kubernetes/ca.crt \\
-  --service-account-private-key-file=/var/lib/kubernetes/service-account.key \\
+  --root-ca-file=/var/lib/kubernetes/ca.pem \\
+  --service-account-private-key-file=/var/lib/kubernetes/service-account-key.pem \\
   --service-cluster-ip-range=10.32.0.0/24 \\
   --use-service-account-credentials=true \\
   --v=2
@@ -124,7 +128,6 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
-RestartSec=5
 
 
 Configure the Kubernetes Scheduler
@@ -132,6 +135,18 @@ Configure the Kubernetes Scheduler
 Move the kube-scheduler kubeconfig into place:
 
 sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
+
+Create the kube-scheduler.yaml configuration file:
+
+cat <<EOF | sudo tee /etc/kubernetes/config/kube-scheduler.yaml
+apiVersion: kubescheduler.config.k8s.io/v1alpha1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "/var/lib/kubernetes/kube-scheduler.kubeconfig"
+leaderElection:
+  leaderElect: true
+EOF
+
 
 Create the kube-scheduler.service systemd unit file:
 
@@ -142,9 +157,7 @@ Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 ExecStart=/usr/local/bin/kube-scheduler \\
-  --kubeconfig=/var/lib/kubernetes/kube-scheduler.kubeconfig \\
-  --address=127.0.0.1 \\
-  --leader-elect=true \\
+  --config=/etc/kubernetes/config/kube-scheduler.yaml \\
   --v=2
 Restart=on-failure
 RestartSec=5
@@ -168,11 +181,12 @@ kubectl get componentstatuses --kubeconfig admin.kubeconfig
 
 Load balancer need to be configured for this to work.
 
-NAME                 STATUS    MESSAGE              ERROR
-controller-manager   Healthy   ok
-scheduler            Healthy   ok
-etcd-0               Healthy   {"health": "true"}
-etcd-1               Healthy   {"health": "true"}
+NAME                 STATUS    MESSAGE             ERROR
+scheduler            Healthy   ok                  
+etcd-0               Healthy   {"health":"true"}   
+etcd-1               Healthy   {"health":"true"}   
+controller-manager   Healthy   ok                  
+etcd-2               Healthy   {"health":"true"}
 
 The Kubernetes Frontend Load Balancer
 =======================================
@@ -188,7 +202,7 @@ loadbalancer# sudo apt-get update && sudo apt-get install -y haproxy
 
 loadbalancer# cat <<EOF | sudo tee /etc/haproxy/haproxy.cfg 
 frontend kubernetes
-    bind 34.197.154.195:6443
+    bind 10.240.0.197:6443
     option tcplog
     mode tcp
     default_backend kubernetes-master-nodes
@@ -197,9 +211,9 @@ backend kubernetes-master-nodes
     mode tcp
     balance roundrobin
     option tcp-check
-    server master1 35.170.64.94:6443 check fall 3 rise 2
-    server master2 3.214.215.215:6443 check fall 3 rise 2
-    server master3 3.231.219.99:6443 check fall 3 rise 2
+    server master1 10.240.0.10:6443 check fall 3 rise 2
+    server master2 10.240.0.11:6443 check fall 3 rise 2
+    server master3 10.240.0.12:6443 check fall 3 rise 2
 EOF
 
 loadbalancer# sudo service haproxy restart
