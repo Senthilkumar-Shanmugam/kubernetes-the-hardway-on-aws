@@ -48,12 +48,12 @@ Documentation=https://github.com/coreos
 [Service]
 ExecStart=/usr/local/bin/etcd \\
   --name ${ETCD_NAME} \\
-  --cert-file=/etc/etcd/etcd-server.crt \\
-  --key-file=/etc/etcd/etcd-server.key \\
-  --peer-cert-file=/etc/etcd/etcd-server.crt \\
-  --peer-key-file=/etc/etcd/etcd-server.key  \\
-  --trusted-ca-file=/etc/etcd/ca.crt \\
-  --peer-trusted-ca-file=/etc/etcd/ca.crt \\
+  --cert-file=/etc/etcd/kubernetes.pem \\
+  --key-file=/etc/etcd/kubernetes-key.pem \\
+  --peer-cert-file=/etc/etcd/kubernetes.pem \\
+  --peer-key-file=/etc/etcd/kubernetes-key.pem \\
+  --trusted-ca-file=/etc/etcd/ca.pem \\
+  --peer-trusted-ca-file=/etc/etcd/ca.pem \\
   --peer-client-cert-auth \\
   --client-cert-auth \\
   --initial-advertise-peer-urls https://${INTERNAL_IP}:2380 \\
@@ -84,8 +84,8 @@ List the etcd cluster members:
 
 sudo ETCDCTL_API=3 etcdctl member list \
   --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/etcd/ca.crt \
-  --cert=/etc/etcd/etcd-server.crt \
-  --key=/etc/etcd/etcd-server.key
+  --cacert=/etc/etcd/ca.pem \
+  --cert=/etc/etcd/kubernetes.pem \
+  --key=/etc/etcd/kubernetes-key.pem
 
 output
