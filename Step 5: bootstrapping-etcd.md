@@ -22,7 +22,7 @@ Extract and install the etcd server and the etcdctl command line utility:
 Configure the etcd Server
 {
   sudo mkdir -p /etc/etcd /var/lib/etcd
-  sudo cp ca.crt etcd-server.key etcd-server.crt /etc/etcd/
+  sudo cp ca.pem kubernetes-key.pem kubernetes.pem /etc/etcd/
 }
 
 The instance internal IP address will be used to serve client requests and communicate with etcd cluster peers.
