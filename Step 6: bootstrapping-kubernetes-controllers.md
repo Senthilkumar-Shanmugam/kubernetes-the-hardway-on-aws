@@ -190,6 +190,36 @@ etcd-1               Healthy   {"health":"true"}
 controller-manager   Healthy   ok                  
 etcd-2               Healthy   {"health":"true"}
 
+Register Controllers with Target Group
+==============================================
+Retrieve the ARN for the kubernetes-targets target group:
+
+TARGET_GROUP_ARN=$(aws elbv2 describe-target-groups \
+  --output text \
+  --names kubernetes-targets \
+  --query "TargetGroups[*].TargetGroupArn")
+  
+Register controllers with the target group:
+============================================
+for i in 0 1 2; do
+  INSTANCE_ID=$(aws ec2 describe-instances \
+    --filters "{\"Name\":\"tag:Name\", \"Values\":[\"controller-${i}\"]}" "{\"Name\":\"instance-state-name\", \"Values\":[\"running\"]}" | jq -j '.Reservations[].Instances[].InstanceId')
+
+  aws elbv2 register-targets \
+    --target-group-arn ${TARGET_GROUP_ARN} \
+    --targets Id=${INSTANCE_ID}
+done
+
+Verification
+
+List the etcd cluster members:
+
+aws elbv2 describe-target-health \
+  --output table \
+  --target-group-arn ${TARGET_GROUP_ARN}
+  
+Output
+
 The Kubernetes Frontend Load Balancer
 =======================================
 
@@ -236,3 +266,16 @@ output
   "compiler": "gc",
   "platform": "linux/amd64"
 }
+
+curl https://kubernetes-the-hard-way-0b20c089c4c325b3.elb.us-east-1.amazonaws.com:6443/version -k
+{
+  "major": "1",
+  "minor": "13",
+  "gitVersion": "v1.13.0",
+  "gitCommit": "ddf47ac13c1a9483ea035a79cd7c10005ff21a6d",
+  "gitTreeState": "clean",
+  "buildDate": "2018-12-03T20:56:12Z",
+  "goVersion": "go1.11.2",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+
