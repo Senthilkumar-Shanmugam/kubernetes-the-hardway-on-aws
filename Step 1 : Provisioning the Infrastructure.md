@@ -254,6 +254,29 @@ for i in 0 1 2; do
     --tags "Key=Name,Value=worker-${i}"
 done
 
+Verification
+===============
+
+List the compute instances in your kubernetes-the-hard-way VPC:
+
+aws ec2 describe-instances \
+  --output table \
+  --filters "Name=vpc-id,Values=${VPC_ID}" \
+  --query "Reservations[*].Instances[*].{Zone:Placement.AvailabilityZone,Instance_Type:InstanceType,Private_IP:PrivateIpAddress,Public_IP:PublicIpAddress,Status:State.Name,Name:Tags[?Key=='Name']|[0].Value}"
+
+---------------------------------------------------------------------------------------------
+|                                     DescribeInstances                                     |
++---------------+---------------+--------------+-----------------+-----------+--------------+
+| Instance_Type |     Name      | Private_IP   |    Public_IP    |  Status   |    Zone      |
++---------------+---------------+--------------+-----------------+-----------+--------------+
+|  t2.micro     |  controller-1 |  10.240.0.11 |  3.87.103.54    |  running  |  us-east-1d  |
+|  t2.micro     |  controller-0 |  10.240.0.10 |  52.207.140.83  |  running  |  us-east-1d  |
+|  t2.micro     |  worker-0     |  10.240.0.20 |  3.90.174.174   |  running  |  us-east-1d  |
+|  t2.micro     |  worker-1     |  10.240.0.21 |  18.232.122.188 |  running  |  us-east-1d  |
+|  t2.micro     |  worker-2     |  10.240.0.22 |  54.165.120.42  |  running  |  us-east-1d  |
+|  t2.micro     |  controller-2 |  10.240.0.12 |  54.165.186.224 |  running  |  us-east-1d  |
++---------------+---------------+--------------+-----------------+-----------+--------------+
+
 Once instances are created verify that you are able to login into all 6 instances. It also has docker version 19 in all nodes.
 
 ssh -i ssh/{public key} ubuntu@{PUBLIC_IP}
