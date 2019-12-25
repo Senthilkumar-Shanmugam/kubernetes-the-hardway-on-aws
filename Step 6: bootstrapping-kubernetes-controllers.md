@@ -29,7 +29,7 @@ wget -q --show-progress --https-only --timestamping \
   Install the Kubernetes binaries:
 
 chmod +x kube-apiserver kube-controller-manager kube-scheduler kubectl
-sudo mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
+  sudo mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
 
 Configure the Kubernetes API Server
 ===================================
@@ -136,7 +136,9 @@ Move the kube-scheduler kubeconfig into place:
 
 sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
 
-Create the kube-scheduler.yaml configuration file:
+Create the kube-scheduler.yaml configuration file:/etc
+
+sudo mkdir -p  /etc/kubernetes/config/kube-scheduler.yaml
 
 cat <<EOF | sudo tee /etc/kubernetes/config/kube-scheduler.yaml
 apiVersion: kubescheduler.config.k8s.io/v1alpha1
