@@ -52,7 +52,9 @@ sudo tar -xvf containerd-1.2.0-beta.2.linux-amd64.tar.gz -C /
 Configure Kubelet
 ===================
 
-sudo mv *.* /var/lib/kubelet
+sudo mv ${WORKER_NAME}-key.pem ${WORKER_NAME}.pem /var/lib/kubelet/
+sudo mv ${WORKER_NAME}.kubeconfig /var/lib/kubelet/kubeconfig
+sudo mv ca.pem /var/lib/kubernetes/
 
 ****************************************************************
 POD_CIDR=$(curl -s http://169.254.169.254/latest/user-data/ \
@@ -63,9 +65,7 @@ WORKER_NAME=$(curl -s http://169.254.169.254/latest/user-data/ \
 | tr "|" "\n" | grep "^name" | cut -d"=" -f2)
 echo "${WORKER_NAME}"
 
-sudo mv ${WORKER_NAME}-key.pem ${WORKER_NAME}.pem /var/lib/kubelet/
-sudo mv ${WORKER_NAME}.kubeconfig /var/lib/kubelet/kubeconfig
-sudo mv ca.pem /var/lib/kubernetes/
+
 *******************************************************************
 
 Create the kubelet-config.yaml configuration file:
