@@ -6,6 +6,11 @@ each node: runc, gVisor, container networking plugins, containerd, kubelet, and 
 
 Provisioning a Kubernetes Worker Node
 =====================================
+
+
+https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-16-04
+
+
 sudo apt-get update
 sudo apt-get -y install socat conntrack ipset
 sudo apt install docker.io
@@ -47,6 +52,9 @@ sudo tar -xvf containerd-1.2.0-beta.2.linux-amd64.tar.gz -C /
 Configure Kubelet
 ===================
 
+sudo mv *.* /var/lib/kubelet
+
+****************************************************************
 POD_CIDR=$(curl -s http://169.254.169.254/latest/user-data/ \
   | tr "|" "\n" | grep "^pod-cidr" | cut -d"=" -f2)
 echo "${POD_CIDR}"
@@ -58,6 +66,7 @@ echo "${WORKER_NAME}"
 sudo mv ${WORKER_NAME}-key.pem ${WORKER_NAME}.pem /var/lib/kubelet/
 sudo mv ${WORKER_NAME}.kubeconfig /var/lib/kubelet/kubeconfig
 sudo mv ca.pem /var/lib/kubernetes/
+*******************************************************************
 
 Create the kubelet-config.yaml configuration file:
 
@@ -70,18 +79,15 @@ authentication:
   webhook:
     enabled: true
   x509:
-    clientCAFile: "/var/lib/kubernetes/ca.pem"
+    clientCAFile: "/var/lib/kubernetes/ca.crt"
 authorization:
   mode: Webhook
 clusterDomain: "cluster.local"
 clusterDNS:
   - "10.32.0.10"
-podCIDR: "${POD_CIDR}"
+resolvConf: "/run/systemd/resolve/resolv.conf"
 runtimeRequestTimeout: "15m"
-tlsCertFile: "/var/lib/kubelet/${WORKER_NAME}.pem"
-tlsPrivateKeyFile: "/var/lib/kubelet/${WORKER_NAME}-key.pem"
 EOF
-
 
 Create the kubelet.service systemd unit file:
 
@@ -97,6 +103,8 @@ ExecStart=/usr/local/bin/kubelet \\
   --config=/var/lib/kubelet/kubelet-config.yaml \\
   --image-pull-progress-deadline=2m \\
   --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --tls-cert-file=/var/lib/kubelet/${HOSTNAME}.crt \\
+  --tls-private-key-file=/var/lib/kubelet/${HOSTNAME}.key \\
   --network-plugin=cni \\
   --register-node=true \\
   --v=2
