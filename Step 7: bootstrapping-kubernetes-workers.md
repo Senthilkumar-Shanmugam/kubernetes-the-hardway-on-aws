@@ -79,7 +79,7 @@ authentication:
   webhook:
     enabled: true
   x509:
-    clientCAFile: "/var/lib/kubernetes/ca.crt"
+    clientCAFile: "/var/lib/kubernetes/ca.pem"
 authorization:
   mode: Webhook
 clusterDomain: "cluster.local"
@@ -103,8 +103,8 @@ ExecStart=/usr/local/bin/kubelet \\
   --config=/var/lib/kubelet/kubelet-config.yaml \\
   --image-pull-progress-deadline=2m \\
   --kubeconfig=/var/lib/kubelet/kubeconfig \\
-  --tls-cert-file=/var/lib/kubelet/${HOSTNAME}.crt \\
-  --tls-private-key-file=/var/lib/kubelet/${HOSTNAME}.key \\
+  --tls-cert-file=/var/lib/kubelet/${INSTANCE_NAME}.pem \\
+  --tls-private-key-file=/var/lib/kubelet/${INSTANCE_NAME}-key.pem \\
   --network-plugin=cni \\
   --register-node=true \\
   --v=2
